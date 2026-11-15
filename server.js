@@ -19,7 +19,7 @@ const pay = require('./payments');
 
 const PROD = process.env.NODE_ENV === 'production';
 const PORT = Number(process.env.PORT || 3000);
-const HOST = process.env.HOST || '127.0.0.1';
+const HOST = process.env.HOST || '0.0.0.0';
 const BASE_URL = (process.env.BASE_URL || `http://localhost:${PORT}`).replace(/\/+$/, '');
 const STORE_NAME = (process.env.STORE_NAME || 'Mi Tienda de Ropa').slice(0, 60);
 const WHATSAPP = String(process.env.WHATSAPP_NUMBER || '').replace(/\D/g, '').slice(0, 15);
