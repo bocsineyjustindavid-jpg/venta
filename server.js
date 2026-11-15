@@ -42,19 +42,26 @@ function sessionSecret() {
 }
 
 function seedAdmin() {
-  if (db.prepare('SELECT COUNT(*) c FROM admins').get().c) return;
-  const user = clean(process.env.ADMIN_USER || 'admin', 40);
-  let pass = process.env.ADMIN_PASSWORD;
-  let generated = false;
-  if (!pass || pass.length < 12) { pass = crypto.randomBytes(12).toString('base64url'); generated = true; }
-  db.prepare('INSERT INTO admins (username, password_hash) VALUES (?, ?)').run(user, bcrypt.hashSync(pass, 12));
-  console.log('\n=== ADMINISTRADOR CREADO ===');
-  console.log('Usuario    :', user);
-  if (generated) console.log('Contraseña :', pass, '  (guárdala y cámbiala desde el panel; no se mostrará de nuevo)');
-  else console.log('Contraseña : la definida en ADMIN_PASSWORD (quítala del .env después del primer arranque)');
-  console.log('============================\n');
+  db.get('SELECT COUNT(*) as c FROM admins', (err, row) => {
+    if (err || (row && row.c > 0)) return;
+    const user = clean(process.env.ADMIN_USER || 'admin', 40);
+    let pass = process.env.ADMIN_PASSWORD;
+    let generated = false;
+    if (!pass || pass.length < 12) { pass = crypto.randomBytes(12).toString('base64url'); generated = true; }
+    
+    db.run('INSERT OR IGNORE INTO admins (username, password_hash) VALUES (?, ?)', [user, bcrypt.hashSync(pass, 12)], function(err) {
+      if (!err && this.changes > 0) {
+        console.log('\n=== ADMINISTRADOR CREADO ===');
+        console.log('Usuario     :', user);
+        if (generated) console.log('Contraseña :', pass, '  (guárdala y cámbiala desde el panel; no se mostrará de nuevo)');
+        else console.log('Contraseña : la definida en ADMIN_PASSWORD (quítala del .env después del primer arranque)');
+        console.log('============================\n');
+      }
+    });
+  });
 }
 seedAdmin();
+
 const DUMMY_HASH = bcrypt.hashSync(crypto.randomBytes(8).toString('hex'), 12);
 
 /* ---------- app y cabeceras de seguridad ---------- */
@@ -100,20 +107,85 @@ const limiter = (windowMs, limit, message) => rateLimit({
 app.use(limiter(15 * 60 * 1000, 600));
 
 /* ---------- webhook de Stripe (cuerpo crudo, ANTES de json y sesión) ---------- */
-const markPaid = db.transaction((publicId, expectedCents) => {
-  const o = db.prepare('SELECT * FROM orders WHERE public_id = ?').get(publicId);
-  if (!o || o.status !== 'pendiente') return;
-  if (expectedCents != null && expectedCents !== o.total_cents) {
-    db.prepare("UPDATE orders SET status = 'revisar' WHERE id = ?").run(o.id);
-    return;
-  }
-  let ok = true;
-  const dec = db.prepare('UPDATE products SET stock = stock - ? WHERE id = ? AND stock >= ?');
-  for (const l of JSON.parse(o.items_json)) {
-    if (dec.run(l.qty, l.id, l.qty).changes === 0) ok = false;
-  }
-  db.prepare('UPDATE orders SET status = ? WHERE id = ?').run(ok ? 'pagado' : 'revisar', o.id);
-});
+/* ---------- webhook de Stripe (adaptado para sqlite3 estándar) ---------- */
+const markPaid = (publicId, expectedCents, callback) => {
+  db.serialize(() => {
+    db.run('BEGIN TRANSACTION;', (err) => {
+      if (err) return callback ? callback(err) : console.error(err);
+
+      // 1. Buscar la orden
+      db.get('SELECT * FROM orders WHERE public_id = ?', [publicId], (err, o) => {
+        if (err || !o || o.status !== 'pendiente') {
+          db.run('ROLLBACK;');
+          return callback ? callback(err || new Error('Orden no válida')) : null;
+        }
+
+        // 2. Validar el monto
+        // 2. Validar el monto
+if (expectedCents != null && expectedCents !== o.total_cents) {
+  db.run("UPDATE orders SET status = 'revisar' WHERE id = ?", [o.id], (err) => {
+    if (err) {
+      db.run('ROLLBACK;');
+      return callback ? callback(err) : null;
+    }
+    db.run('COMMIT;', (err) => {
+      if (err) return callback ? callback(err) : null;
+      return callback ? callback(null, { status: 'revisar' }) : null;
+    });
+  });
+  return;
+}
+
+        // 3. Procesar los ítems y actualizar stock
+        let items;
+        try {
+          items = JSON.parse(o.items_json);
+        } catch (e) {
+          db.run('ROLLBACK;');
+          return callback ? callback(e) : null;
+        }
+
+        let ok = true;
+        let processed = 0;
+
+        if (items.length === 0) {
+          finalizeOrder(o.id, true, callback);
+          return;
+        }
+
+        items.forEach((l) => {
+          db.run(
+            'UPDATE products SET stock = stock - ? WHERE id = ? AND stock >= ?',
+            [l.qty, l.id, l.qty],
+            function (err) {
+              if (err || this.changes === 0) {
+                ok = false;
+              }
+              processed++;
+              if (processed === items.length) {
+                finalizeOrder(o.id, ok, callback);
+              }
+            }
+          );
+        });
+      });
+    });
+  });
+};
+
+function finalizeOrder(orderId, ok, callback) {
+  const newStatus = ok ? 'pagado' : 'revisar';
+  db.run('UPDATE orders SET status = ? WHERE id = ?', [newStatus, orderId], (err) => {
+    if (err) {
+      db.run('ROLLBACK;');
+      return callback ? callback(err) : null;
+    }
+    db.run('COMMIT;', (err) => {
+      if (err) return callback ? callback(err) : null;
+      if (callback) callback(null, { status: newStatus });
+    });
+  });
+}
 
 app.post('/api/stripe/webhook', express.raw({ type: 'application/json', limit: '1mb' }), (req, res) => {
   if (!pay.stripe || !process.env.STRIPE_WEBHOOK_SECRET) return res.status(503).end();
