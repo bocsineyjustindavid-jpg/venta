@@ -1,0 +1,133 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Tienda de ropa</title>
+  <meta name="description" content="Ropa nueva, tallas y precios actualizados. Compra en línea con tarjeta o PayPal.">
+  <link rel="stylesheet" href="/styles.css">
+</head>
+<body>
+  <header class="top">
+    <a class="brand" href="#inicio" id="brand">Tienda</a>
+    <nav class="nav" aria-label="Principal">
+      <a href="#nuevos">Nuevos</a>
+      <a href="#catalogo">Catálogo</a>
+      <a href="#resenas">Reseñas</a>
+      <a href="#contacto">Contacto</a>
+    </nav>
+    <button class="cart-btn" id="open-cart" type="button" aria-label="Abrir carrito">
+      Carrito <span class="badge" id="cart-count">0</span>
+    </button>
+  </header>
+
+  <main id="inicio">
+    <section class="hero">
+      <p class="eyebrow">Nueva colección</p>
+      <h1>Ropa que te queda <em>como a ti</em></h1>
+      <p class="lead">Prendas nuevas cada semana. Revisa lo que hay disponible, arma tu carrito y paga en línea de forma segura.</p>
+      <a class="btn" href="#catalogo">Ver catálogo</a>
+    </section>
+
+    <div id="notice" class="notice" role="status" hidden></div>
+
+    <section id="nuevos" class="block">
+      <h2>Recién llegados</h2>
+      <div class="grid" id="grid-new"></div>
+    </section>
+
+    <section id="catalogo" class="block">
+      <div class="block-head">
+        <h2>Todo lo disponible</h2>
+        <div class="filters">
+          <label class="sr" for="search">Buscar</label>
+          <input id="search" type="search" placeholder="Buscar prenda…" maxlength="60" autocomplete="off">
+          <label class="sr" for="category">Categoría</label>
+          <select id="category"><option value="">Todas las categorías</option></select>
+        </div>
+      </div>
+      <div class="grid" id="grid-all"></div>
+      <p class="empty" id="empty" hidden>No encontramos prendas con ese filtro.</p>
+    </section>
+
+    <section id="resenas" class="block alt">
+      <h2>Lo que dicen nuestros clientes</h2>
+      <div class="reviews" id="reviews"></div>
+      <form id="review-form" class="card form" novalidate>
+        <h3>Deja tu reseña</h3>
+        <label>Tu nombre <input name="name" required minlength="2" maxlength="60" autocomplete="name"></label>
+        <fieldset class="stars-field">
+          <legend>Calificación</legend>
+          <div class="stars-input" id="stars-input"></div>
+          <input type="hidden" name="rating" value="5">
+        </fieldset>
+        <label>Comentario <textarea name="comment" required minlength="3" maxlength="1000" rows="4"></textarea></label>
+        <input class="hp" type="text" name="website" tabindex="-1" autocomplete="off" aria-hidden="true">
+        <button class="btn" type="submit">Enviar reseña</button>
+        <p class="form-msg" role="status"></p>
+      </form>
+    </section>
+
+    <section id="contacto" class="block">
+      <h2>¿Dudas o comentarios?</h2>
+      <div class="contact-wrap">
+        <form id="contact-form" class="card form" novalidate>
+          <label>Nombre <input name="name" required minlength="2" maxlength="80" autocomplete="name"></label>
+          <label>Correo <input name="email" type="email" required maxlength="254" autocomplete="email"></label>
+          <label>Teléfono (opcional) <input name="phone" type="tel" maxlength="30" autocomplete="tel"></label>
+          <label>Motivo
+            <select name="kind">
+              <option value="duda">Tengo una duda</option>
+              <option value="reseña">Quiero dejar una reseña</option>
+              <option value="pedido">Consulta sobre un pedido</option>
+              <option value="otro">Otro</option>
+            </select>
+          </label>
+          <label>Mensaje <textarea name="message" required minlength="3" maxlength="2000" rows="5"></textarea></label>
+          <input class="hp" type="text" name="website" tabindex="-1" autocomplete="off" aria-hidden="true">
+          <button class="btn" type="submit">Enviar mensaje</button>
+          <p class="form-msg" role="status"></p>
+        </form>
+        <aside class="card wa-card">
+          <h3>¿Prefieres WhatsApp?</h3>
+          <p>Escríbenos directamente y te respondemos por ahí.</p>
+          <a class="btn wa" id="wa-link" href="#contacto" target="_blank" rel="noopener noreferrer" hidden>Abrir WhatsApp</a>
+          <p class="muted" id="wa-missing" hidden>WhatsApp aún no está configurado.</p>
+        </aside>
+      </div>
+    </section>
+  </main>
+
+  <footer class="foot">
+    <p><span id="foot-name">Tienda</span> · Pagos protegidos por Stripe y PayPal. No almacenamos datos de tarjetas.</p>
+    <p><a href="/admin/" rel="nofollow">Acceso administrador</a></p>
+  </footer>
+
+  <div class="overlay" id="overlay" hidden></div>
+  <aside class="drawer" id="drawer" aria-label="Carrito de compras" aria-hidden="true">
+    <div class="drawer-head">
+      <h2>Tu carrito</h2>
+      <button type="button" class="icon-btn" id="close-cart" aria-label="Cerrar carrito">✕</button>
+    </div>
+    <div id="cart-lines" class="cart-lines"></div>
+    <p class="empty" id="cart-empty">Tu carrito está vacío.</p>
+    <div class="cart-total" id="cart-total-wrap" hidden>Total <strong id="cart-total"></strong></div>
+
+    <form id="checkout-form" class="form checkout" hidden novalidate>
+      <h3>Datos de entrega</h3>
+      <label>Nombre completo <input name="name" required minlength="2" maxlength="100" autocomplete="name"></label>
+      <label>Correo <input name="email" type="email" required maxlength="254" autocomplete="email"></label>
+      <label>Teléfono <input name="phone" type="tel" required maxlength="30" autocomplete="tel"></label>
+      <label>Dirección de entrega <textarea name="address" required minlength="5" maxlength="300" rows="3" autocomplete="street-address"></textarea></label>
+      <div class="pay-buttons">
+        <button class="btn" type="button" id="pay-stripe" hidden>Pagar con tarjeta (débito / crédito)</button>
+        <button class="btn paypal" type="button" id="pay-paypal" hidden>Pagar con PayPal</button>
+      </div>
+      <p class="muted" id="pay-missing" hidden>Los pagos en línea aún no están configurados. Puedes pedir por WhatsApp.</p>
+      <p class="form-msg" role="status" id="checkout-msg"></p>
+    </form>
+  </aside>
+
+  <script src="/app.js" defer></script>
+</body>
+</html>
